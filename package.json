@@ -1,0 +1,15 @@
+{
+  "name": "govcrm-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter govcrm dev",
+    "build": "pnpm --filter govcrm build",
+    "typecheck": "pnpm --filter govcrm typecheck",
+    "seed": "pnpm --filter govcrm seed"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}
