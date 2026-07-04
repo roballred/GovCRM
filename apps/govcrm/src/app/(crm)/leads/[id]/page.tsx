@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { ContentDetailScreen } from '@govcore/content/screens'
+import { ContentDetailScreen } from '@/components/content-screens'
 import { lead } from '@/content/lead'
 import { leadActions } from '@/content/actions'
 
@@ -11,13 +11,21 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   if (!row) notFound()
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <div className="max-w-3xl">
       <a href="/leads" className="text-sm text-primary hover:underline">
         ← Leads
       </a>
       <div className="mt-4">
-        <ContentDetailScreen def={lead} row={row as Record<string, unknown>} />
+        <ContentDetailScreen
+          def={lead}
+          row={row as Record<string, unknown>}
+          actions={
+            <a href={`/leads/${id}/edit`} className="rounded-md border border-border px-3 py-1.5 text-sm">
+              Edit
+            </a>
+          }
+        />
       </div>
-    </main>
+    </div>
   )
 }
