@@ -1,56 +1,40 @@
 import type { ReactNode } from 'react'
 import { auth, signOut } from '@/lib/auth'
+import { CrmNav } from '@/components/crm-nav'
 
-const NAV = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/contacts', label: 'Contacts' },
-  { href: '/accounts', label: 'Accounts' },
-  { href: '/leads', label: 'Leads' },
-  { href: '/deals', label: 'Deals' },
-  { href: '/activities', label: 'Activities' },
-]
-
-// Middleware already requires a session for everything under this group; the
-// session read here is for display only.
+// GovEA-style app shell: branded header + left sidebar nav. Middleware already
+// requires a session for everything under this group; the session read here is
+// for display and nav gating only.
 export default async function CrmLayout({ children }: { children: ReactNode }) {
   const session = await auth()
   const user = session?.user
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3">
-          <a href="/dashboard" className="text-sm font-semibold tracking-tight">
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="bg-header text-header-foreground">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+          <a href="/dashboard" className="text-lg font-semibold tracking-tight">
             GovCRM
           </a>
-          <nav className="flex flex-1 gap-4">
-            {NAV.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-          {user?.instanceRole === 'instance_admin' ? (
-            <a href="/instance" className="text-sm text-muted-foreground hover:text-foreground">
-              Instance
-            </a>
-          ) : null}
-          <span className="text-sm text-muted-foreground">{user?.email}</span>
-          <form
-            action={async () => {
-              'use server'
-              await signOut({ redirectTo: '/' })
-            }}
-          >
-            <button className="rounded-md border border-border px-2.5 py-1 text-sm">Sign out</button>
-          </form>
+          <div className="flex items-center gap-4">
+            <span className="text-sm opacity-90">{user?.email}</span>
+            <form
+              action={async () => {
+                'use server'
+                await signOut({ redirectTo: '/' })
+              }}
+            >
+              <button className="rounded-md border border-header-foreground px-2.5 py-1 text-sm opacity-80 hover:opacity-100">
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
-      {children}
+      <div className="mx-auto flex max-w-6xl gap-8 px-6 py-8">
+        <CrmNav showInstance={user?.instanceRole === 'instance_admin'} />
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   )
 }

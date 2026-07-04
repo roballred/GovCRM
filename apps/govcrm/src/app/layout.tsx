@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { themeToCss } from '@govcore/theme'
+import { govcrmTheme } from '@/lib/theme'
 import './globals.css'
 
 export const metadata = {
@@ -9,7 +11,11 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-background text-foreground antialiased">{children}</body>
+      <body className="bg-background text-foreground antialiased">
+        {/* Brand theme over the WCAG-AA base tokens — defineTheme sanitizes values. */}
+        <style dangerouslySetInnerHTML={{ __html: themeToCss(govcrmTheme) }} />
+        {children}
+      </body>
     </html>
   )
 }
