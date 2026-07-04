@@ -24,3 +24,9 @@ const authClient =
 globalForDb.__authClient = authClient
 
 export const authDb = drizzle(authClient, { schema })
+
+// The same owner pool under its operator-plane name: instance-console reads
+// are legitimately cross-org (instance_admin inventory of orgs/users/audit),
+// which the RLS-bound runtime pool rightly forbids. Every use MUST be behind
+// an instanceRole === 'instance_admin' check. Same GovCore gap as auth (#57).
+export const platformDb = authDb

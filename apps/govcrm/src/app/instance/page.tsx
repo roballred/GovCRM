@@ -1,38 +1,24 @@
 import { desc } from 'drizzle-orm'
-import { db } from '@/db/client'
+import { platformDb } from '@/db/client'
 import { auditLog, organizations, userOrganizationMemberships, users } from '@/db/schema'
-import { auth, signOut } from '@/lib/auth'
-import {
-  Badge,
-  DataTable,
-  InstanceConsoleShell,
-  PageHeader,
-  StatCard,
-  StatGrid,
-} from '@govcore/nextkit'
+import { Badge, DataTable, PageHeader, StatCard, StatGrid } from '@govcore/nextkit'
 
 export const dynamic = 'force-dynamic'
 
 // Capability: po-instance-administration — cross-org operator console.
+// Reads the privileged platformDb pool: this inventory is legitimately
+// cross-org, which RLS on the runtime pool rightly forbids. Access is gated
+// to instance_admin in middleware AND ./layout.tsx.
 export default async function InstancePage() {
-  const session = await auth()
-
   const [orgs, allUsers, memberships, audits] = await Promise.all([
-    db.select().from(organizations),
-    db.select().from(users),
-    db.select().from(userOrganizationMemberships),
-    db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(8),
+    platformDb.select().from(organizations),
+    platformDb.select().from(users),
+    platformDb.select().from(userOrganizationMemberships),
+    platformDb.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(8),
   ])
 
-  const nav = [
-    { href: '/instance', label: 'Overview', active: true },
-    { href: '/instance#orgs', label: 'Organizations' },
-    { href: '/instance#users', label: 'Users' },
-    { href: '/instance#audit', label: 'Audit log' },
-  ]
-
   return (
-    <InstanceConsoleShell title="GovCRM · Instance Console" nav={nav} user={session?.user}>
+    <>
       <PageHeader title="Overview" description="Cross-organization view for instance administrators." />
 
       <StatGrid>
@@ -92,16 +78,6 @@ export default async function InstancePage() {
           ]}
         />
       </section>
-
-      <form
-        action={async () => {
-          'use server'
-          await signOut({ redirectTo: '/' })
-        }}
-        className="mt-10"
-      >
-        <button className="rounded-md border border-border px-3 py-1.5 text-sm">Sign out</button>
-      </form>
-    </InstanceConsoleShell>
+    </>
   )
 }
