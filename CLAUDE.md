@@ -17,7 +17,9 @@ GovCRM is a free, open-source CRM for state and local government, built on the *
 - **Tenant isolation is RLS + the `app.current_org` GUC** set inside `tenantAction` transactions from the trusted session. Never accept an organization ID from request input.
 - **Role vocabulary is app-local** (admin / contributor / viewer in `src/lib/rbac.ts`), supplied to `createRbac` — GovCore has no baked-in roles.
 - **Next.js middleware `config.matcher` must stay inline** — an imported matcher value fails Next's static parsing.
-- **No local Postgres** on this machine: `pnpm build`/typecheck work locally; `seed`/`dev`/DB tests need a container or CI.
+- **The app must connect as the non-superuser runtime role (`govcrm_app`)** — superusers bypass RLS, silently disabling tenant isolation. The seed provisions the role and grants (two-role split, GovCore design §13.2). Verified: cross-org reads return 0 rows under this role.
+- **Auth uses a separate owner-credentialed pool** (`AUTH_DATABASE_URL`, only consumed by `createAuth` via `authDb`): the login credentials lookup runs before any org context exists, and `govcore.users` RLS requires the org GUC — login is impossible on the runtime role. GovCore consumer gap, filed upstream.
+- **Local DB runs in podman** (`podman run -d --name govcrm-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 docker.io/library/postgres:16`), then seed with the owner URL: `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/govcrm_dev pnpm seed`. `pnpm build`/typecheck need no DB.
 
 ## Traceability
 

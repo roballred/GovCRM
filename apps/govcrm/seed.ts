@@ -1,6 +1,6 @@
 // Seed a throwaway demo database: create it, run the GovCore platform
-// migrations, compile the `contact` content type, and insert demo orgs, users,
-// memberships, audit events, and contacts.
+// migrations, compile the CRM content types (in reference-dependency order),
+// and insert demo orgs, users, memberships, and CRM records.
 //
 //   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/govcrm_dev \
 //     pnpm --filter govcrm seed
@@ -16,7 +16,11 @@ import {
   userOrganizationMemberships,
   users,
 } from '@govcore/schema'
+import { account, accountTable } from './src/content/account'
+import { activity, activityTable } from './src/content/activity'
 import { contact, contactTable } from './src/content/contact'
+import { deal, dealTable } from './src/content/deal'
+import { lead, leadTable } from './src/content/lead'
 
 const url = process.env.DATABASE_URL
 if (!url) {
@@ -41,15 +45,31 @@ async function main() {
   await admin.end()
   console.log(`• created ${dbName}`)
 
-  // 2. platform migrations, then the `contact` content type's table (folds into
-  // the app migration stream once GovCRM has one).
+  // 2. platform migrations, then the CRM content-type tables. Reference targets
+  // must be compiled before the types that point at them: account → contact →
+  // lead → deal → activity. (Folds into the app migration stream later.)
   await migrate({ connectionString: url, log: (m) => console.log(`  ${m}`) })
   const ddl = postgres(url!, { max: 1, onnotice: () => {} })
-  await ddl.unsafe(compileContentType(contact).sql)
-  await ddl.end()
-  console.log('• created content type "contact"')
+  for (const def of [account, contact, lead, deal, activity]) {
+    await ddl.unsafe(compileContentType(def).sql)
+    console.log(`• created content type "${def.name}"`)
+  }
 
-  // 3. seed
+  // 2.5 two-role split (design §13.2): the app must connect as a non-superuser
+  // runtime role — superusers bypass RLS, so running the app as `postgres`
+  // silently disables tenant isolation. Seed/migrate keep the owner URL; the
+  // app's DATABASE_URL uses govcrm_app (see .env.example).
+  await ddl.unsafe(
+    `DO $$ BEGIN CREATE ROLE govcrm_app LOGIN PASSWORD 'govcrm-app-dev'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  )
+  await ddl.unsafe('GRANT USAGE ON SCHEMA govcore TO govcrm_app')
+  await ddl.unsafe('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA govcore TO govcrm_app')
+  await ddl.unsafe('GRANT USAGE ON SCHEMA content TO govcrm_app')
+  await ddl.unsafe('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA content TO govcrm_app')
+  console.log('• created runtime role govcrm_app (non-owner; RLS applies)')
+  await ddl.end()
+
+  // 3. platform seed: orgs, users, memberships
   const sql = postgres(url!, { max: 1, onnotice: () => {} })
   const db = drizzle(sql)
 
@@ -81,6 +101,7 @@ async function main() {
       email: 'casey@riverbend.example',
       name: 'Casey Contributor',
       role: 'contributor',
+      passwordHash,
     })
     .returning()
   const [viewer1] = await db
@@ -90,6 +111,7 @@ async function main() {
       email: 'val@harris.example',
       name: 'Val Viewer',
       role: 'viewer',
+      passwordHash,
     })
     .returning()
 
@@ -105,35 +127,61 @@ async function main() {
     { action: 'user.invite', entityType: 'user', entityId: contributor1.id, organizationId: orgA.id, userId: admin1.id },
   ])
 
-  // Seed contacts for orgA. The contact table FORCEs RLS — set the active-org
-  // GUC first (the same scope tenantAction sets at request time).
+  // 4. CRM seed for orgA. Content tables FORCE RLS — set the active-org GUC
+  // first (the same scope tenantAction sets at request time).
   await sql.unsafe(`SELECT set_config('app.current_org', '${orgA.id}', false)`)
+  const org = { organizationId: orgA.id }
+
+  const [ramirez] = await db
+    .insert(accountTable)
+    .values({ ...org, name: 'Ramirez Paving LLC', account_type: 'vendor', phone: '555-0130', city: 'Riverbend', notes: 'Road-maintenance vendor since 2023.', status: 'published' })
+    .returning()
+  const [chamber] = await db
+    .insert(accountTable)
+    .values({ ...org, name: 'Riverbend Chamber of Commerce', account_type: 'community', phone: '555-0165', website: 'https://riverbendchamber.example', city: 'Riverbend', status: 'published' })
+    .returning()
+  const [countyIT] = await db
+    .insert(accountTable)
+    .values({ ...org, name: 'Harris County IT Services', account_type: 'partner', city: 'Harrisville', notes: 'Shared-services partner for GIS hosting.' })
+    .returning()
+
   const contactRows = [
-    {
-      organizationId: orgA.id,
-      first_name: 'Jordan',
-      last_name: 'Ramirez',
-      email: 'jordan.ramirez@vendor.example',
-      phone: '555-0142',
-      organization_name: 'Ramirez Paving LLC',
-      notes: 'Road-maintenance vendor; renewal conversation due in Q3.',
-    },
-    {
-      organizationId: orgA.id,
-      first_name: 'Priya',
-      last_name: 'Natarajan',
-      email: 'priya.n@riverbendchamber.example',
-      phone: '555-0177',
-      organization_name: 'Riverbend Chamber of Commerce',
-      notes: 'Main liaison for the downtown small-business program.',
-    },
+    { ...org, first_name: 'Jordan', last_name: 'Ramirez', email: 'jordan@ramirezpaving.example', phone: '555-0142', title: 'Owner', account_id: ramirez.id as string, notes: 'Prefers phone over email.', status: 'published' },
+    { ...org, first_name: 'Priya', last_name: 'Natarajan', email: 'priya@riverbendchamber.example', phone: '555-0177', title: 'Executive Director', account_id: chamber.id as string, status: 'published' },
+    { ...org, first_name: 'Sam', last_name: 'Okafor', email: 's.okafor@harriscounty.example', title: 'GIS Program Manager', account_id: countyIT.id as string },
+    { ...org, first_name: 'Dana', last_name: 'Whitfield', email: 'dana.w@resident.example', phone: '555-0190', notes: 'Downtown small-business program applicant.' },
   ]
+  const contacts: Record<string, unknown>[] = []
   for (const r of contactRows) {
-    await db.insert(contactTable).values({ ...r, ...materializedValues(contact, r) })
+    const [row] = await db.insert(contactTable).values({ ...r, ...materializedValues(contact, r) }).returning()
+    contacts.push(row)
   }
 
+  const leadRows = [
+    { ...org, first_name: 'Marcus', last_name: 'Bell', email: 'mbell@bellelectric.example', organization_name: 'Bell Electric', source: 'web-form', lead_status: 'new', notes: 'Asked about the streetlight retrofit RFP.' },
+    { ...org, first_name: 'Elena', last_name: 'Cruz', email: 'ecruz@cruzlandscaping.example', organization_name: 'Cruz Landscaping', source: 'referral', lead_status: 'contacted' },
+    { ...org, first_name: 'Tom', last_name: 'Askew', email: 't.askew@resident.example', source: 'event', lead_status: 'qualified', notes: 'Farmers-market vendor program.' },
+  ]
+  for (const r of leadRows) {
+    await db.insert(leadTable).values({ ...r, ...materializedValues(lead, r) })
+  }
+
+  const [pavingDeal] = await db
+    .insert(dealTable)
+    .values({ ...org, name: 'FY27 road-maintenance contract renewal', account_id: ramirez.id as string, primary_contact_id: contacts[0].id as string, amount: '185000', stage: 'negotiation', close_date: '2026-09-30', status: 'published' })
+    .returning()
+  await db.insert(dealTable).values({ ...org, name: 'Downtown wayfinding signage', account_id: chamber.id as string, primary_contact_id: contacts[1].id as string, amount: '42000', stage: 'proposal', close_date: '2026-08-15' })
+  await db.insert(dealTable).values({ ...org, name: 'GIS hosting shared-services agreement', account_id: countyIT.id as string, primary_contact_id: contacts[2].id as string, amount: '96000', stage: 'qualified', close_date: '2026-11-01' })
+
+  await db.insert(activityTable).values([
+    { ...org, subject: 'Call Jordan about renewal terms', activity_type: 'call', due_date: '2026-07-08', completed: false, contact_id: contacts[0].id as string, deal_id: pavingDeal.id as string },
+    { ...org, subject: 'Chamber quarterly sync', activity_type: 'meeting', due_date: '2026-07-15', completed: false, contact_id: contacts[1].id as string },
+    { ...org, subject: 'Send signage proposal draft', activity_type: 'task', due_date: '2026-07-10', completed: false },
+    { ...org, subject: 'Logged: site visit to paving depot', activity_type: 'note', completed: true, contact_id: contacts[0].id as string, notes: 'Equipment inventory looks sufficient for FY27 scope.' },
+  ])
+
   await sql.end()
-  console.log('• seeded 2 orgs, 3 users, 3 memberships, 3 audit events, 2 contacts')
+  console.log('• seeded 2 orgs, 3 users, 3 accounts, 4 contacts, 3 leads, 3 deals, 4 activities')
   console.log('  sign in: admin@govcrm.test / govcrm-demo')
 }
 

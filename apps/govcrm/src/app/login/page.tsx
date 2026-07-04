@@ -14,7 +14,7 @@ export default async function LoginPage({
       await signIn('credentials', {
         email: formData.get('email'),
         password: formData.get('password'),
-        redirectTo: '/contacts',
+        redirectTo: '/dashboard',
       })
     } catch (err) {
       // signIn throws a redirect on success — rethrow it; anything else is a failed login.

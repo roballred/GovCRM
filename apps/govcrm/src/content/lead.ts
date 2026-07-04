@@ -1,22 +1,24 @@
-// Contact — the people this office works with, optionally tied to an Account.
-// Capability: cdm-contact-management.
+// Lead — an unqualified prospect, kept separate from Contacts until converted.
+// Capability: sfa-lead-management.
 
 import { buildContentTable, defineContentType } from '@govcore/content'
 
-export const contact = defineContentType({
-  name: 'contact',
-  label: 'Contact',
+export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'disqualified'] as const
+
+export const lead = defineContentType({
+  name: 'lead',
+  label: 'Lead',
   fields: [
     { name: 'first_name', label: 'First name', type: 'text', required: true },
     { name: 'last_name', label: 'Last name', type: 'text', required: true },
     { name: 'email', label: 'Email', type: 'text' },
     { name: 'phone', label: 'Phone', type: 'text' },
-    { name: 'account', label: 'Account', type: 'reference', to: 'account' },
-    { name: 'title', label: 'Title', type: 'text' },
+    { name: 'organization_name', label: 'Organization', type: 'text' },
+    { name: 'source', label: 'Source', type: 'text' }, // web-form | referral | event | other
+    { name: 'lead_status', label: 'Lead status', type: 'text' }, // LEAD_STATUSES
     { name: 'notes', label: 'Notes', type: 'textarea' },
   ],
   computed: [
-    // Materialized so lists can render it without recomputing on read.
     {
       name: 'full_name',
       label: 'Name',
@@ -27,5 +29,4 @@ export const contact = defineContentType({
   ],
 })
 
-/** The runtime Drizzle table for `contact` (mirrors the compiled DDL exactly). */
-export const contactTable = buildContentTable(contact)
+export const leadTable = buildContentTable(lead)

@@ -1,15 +1,11 @@
-import { notFound, redirect } from 'next/navigation'
-import { auth } from '@/lib/auth'
-import { contact } from '@/content/contact'
-import { contactActions } from '@/content/contact-actions'
+import { notFound } from 'next/navigation'
 import { ContentDetailScreen } from '@govcore/content/screens'
+import { contact } from '@/content/contact'
+import { contactActions } from '@/content/actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user) redirect('/login')
-
   const { id } = await params
   const row = await contactActions.get({ id }) // RLS-scoped: a foreign org's id returns null
   if (!row) notFound()
