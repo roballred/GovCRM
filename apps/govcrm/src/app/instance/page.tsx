@@ -5,10 +5,9 @@ import { Badge, DataTable, PageHeader, StatCard, StatGrid } from '@govcore/nextk
 
 export const dynamic = 'force-dynamic'
 
-// Capability: po-instance-administration — cross-org operator console.
-// Reads the privileged platformDb pool: this inventory is legitimately
-// cross-org, which RLS on the runtime pool rightly forbids. Access is gated
-// to instance_admin in middleware AND ./layout.tsx.
+// Capability: po-instance-administration — operator overview. Entity list and
+// edit views live on their own routes (organizations/users/audit/support).
+// Reads the privileged platformDb pool; gated in middleware AND ./layout.tsx.
 export default async function InstancePage() {
   const [orgs, allUsers, memberships, audits] = await Promise.all([
     platformDb.select().from(organizations),
@@ -22,48 +21,19 @@ export default async function InstancePage() {
       <PageHeader title="Overview" description="Cross-organization view for instance administrators." />
 
       <StatGrid>
-        <StatCard label="Organizations" value={orgs.length} />
-        <StatCard label="Users" value={allUsers.length} />
+        <StatCard label="Organizations" value={<a className="hover:underline" href="/instance/organizations">{orgs.length}</a>} />
+        <StatCard label="Users" value={<a className="hover:underline" href="/instance/users">{allUsers.length}</a>} />
         <StatCard label="Memberships" value={memberships.length} />
-        <StatCard label="Audit events" value={audits.length} />
+        <StatCard label="Active users" value={allUsers.filter((u) => u.isActive).length} />
       </StatGrid>
 
-      <section id="orgs" className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold">Organizations</h2>
-        <DataTable
-          rows={orgs as unknown as Record<string, unknown>[]}
-          columns={[
-            { key: 'name', header: 'Name' },
-            { key: 'slug', header: 'Slug', cell: (r) => <Badge tone="muted">{String(r.slug)}</Badge> },
-            {
-              key: 'createdAt',
-              header: 'Created',
-              cell: (r) => new Date(r.createdAt as string).toLocaleDateString(),
-            },
-          ]}
-        />
-      </section>
-
-      <section id="users" className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold">Users</h2>
-        <DataTable
-          rows={allUsers as unknown as Record<string, unknown>[]}
-          columns={[
-            { key: 'email', header: 'Email' },
-            { key: 'role', header: 'Role', cell: (r) => <Badge>{String(r.role ?? '—')}</Badge> },
-            {
-              key: 'instanceRole',
-              header: 'Instance',
-              cell: (r) =>
-                r.instanceRole ? <Badge tone="danger">{String(r.instanceRole)}</Badge> : '—',
-            },
-            { key: 'isActive', header: 'Active', cell: (r) => (r.isActive ? 'Yes' : 'No') },
-          ]}
-        />
-      </section>
-
-      <section id="audit" className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold">Recent audit events</h2>
+      <section className="mt-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Recent audit events</h2>
+          <a href="/instance/audit" className="text-sm text-primary hover:underline">
+            View all →
+          </a>
+        </div>
         <DataTable
           empty="No audit events yet."
           rows={audits as unknown as Record<string, unknown>[]}

@@ -29,7 +29,7 @@ The system must let the instance operator help a tenant without normalizing surv
 - The audit trail of a support session is immutable and tenant-visible
 
 ## Implementation Status
-Planned — `@govcore/support` ships the session machinery (break-glass + act-as, TTL, end reasons); GovCRM has not yet wired its console surfaces.
+Partially implemented — the console's Support sessions view lists every break-glass and act-as session (operator, tenant, reason, live active/expired/revoked status), satisfying the visibility rule first. **Not yet wired:** starting, approving, and ending sessions from the console (`@govcore/support` ships the full lifecycle; the UI flows remain to build) and tenant-side visibility for org admins.
 
 ## Links
 - Depends on: po-instance-administration, po-multi-tenancy

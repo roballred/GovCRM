@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { AppShell } from '@/components/app-shell'
+import { InstanceNav } from '@/components/instance-nav'
 import { SignOutButton } from '@/components/sign-out-button'
 
 // Operator-plane shell: same look as the CRM shell (one AppShell), distinct
@@ -12,18 +13,10 @@ export default async function InstanceLayout({ children }: { children: ReactNode
   const session = await auth()
   if (session?.user?.instanceRole !== 'instance_admin') redirect('/dashboard')
 
-  const nav = [
-    { href: '/instance', label: 'Overview', active: true },
-    { href: '/instance#orgs', label: 'Organizations' },
-    { href: '/instance#users', label: 'Users' },
-    { href: '/instance#audit', label: 'Audit log' },
-    { href: '/dashboard', label: '← Back to GovCRM' },
-  ]
-
   return (
     <AppShell
-      title={<a href="/dashboard">GovCRM · Instance Console</a>}
-      nav={nav}
+      title={<a href="/instance">GovCRM · Instance Console</a>}
+      nav={<InstanceNav />}
       navAriaLabel="Instance console"
       user={session?.user ?? undefined}
       actions={<SignOutButton />}

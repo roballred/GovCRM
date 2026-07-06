@@ -28,7 +28,7 @@ The system must give the instance operator a cross-organization console: invento
 - The console is gated in middleware (`instanceOnlyPaths`), not just in page code
 
 ## Implementation Status
-Planned — the app scaffold ships a first `/instance` console (orgs, users, memberships, audit) on `@govcore/nextkit` components, gated by `@govcore/middleware`. Org lifecycle actions (create/suspend from the console) are not yet wired.
+Partially implemented — the `/instance` console now has real routes with list and edit views: organizations (inventory with user counts, create with auto-slug, rename), users (cross-org inventory, create with org/role/initial password/instance-admin grant, edit role/active/instance-admin), a full audit browser (latest 50, actors and orgs resolved to names), and a support-sessions view. All mutations run on the privileged operator pool, are gated to `instance_admin` (middleware + layout + per-action), and are audited (`platform.*` events). Guards shipped: last-active-org-admin cannot be demoted or deactivated; an operator cannot remove their own instance-admin role. **Not yet wired:** org suspension (no core column — GovCore's `organizations.metadata` is the extension point) and deletion; user password reset; pagination on list views.
 
 ## Links
 - Depends on: po-multi-tenancy
