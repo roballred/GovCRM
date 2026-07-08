@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { ContentDetailScreen } from '@/components/content-screens'
+import { ContentDetailScreen } from '@govcore/content/screens'
 import { lead } from '@/content/lead'
 import { leadActions } from '@/content/actions'
 

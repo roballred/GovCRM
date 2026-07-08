@@ -1,21 +1,22 @@
 // Seed a throwaway demo database: create it, run the GovCore platform
-// migrations, compile the CRM content types (in reference-dependency order),
-// and insert demo orgs, users, memberships, and CRM records.
+// migrations, compile the CRM content types, provision the non-owner runtime
+// role, bootstrap the first org + instance-admin, then add demo orgs/users and
+// CRM records.
 //
 //   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/govcrm_dev \
 //     pnpm --filter govcrm seed
+//
+// The platform bring-up (runtime role + first org/admin) now comes from
+// @govcore/setup rather than being hand-rolled here; the demo org/users are
+// created with the same core functions the instance console uses.
 
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from '@govcore/schema/migrate'
-import { hashPassword } from '@govcore/auth/password'
+import { bootstrap, provisionRuntimeRole } from '@govcore/setup'
+import { createOrganization } from '@govcore/tenancy'
+import { provisionUser } from '@govcore/auth'
 import { compileContentType, materializedValues } from '@govcore/content'
-import {
-  auditLog,
-  organizations,
-  userOrganizationMemberships,
-  users,
-} from '@govcore/schema'
 import { account, accountTable } from './src/content/account'
 import { activity, activityTable } from './src/content/activity'
 import { contact, contactTable } from './src/content/contact'
@@ -37,6 +38,8 @@ const adminUrl = (() => {
   return u.toString()
 })()
 
+const DEMO_PASSWORD = 'govcrm-demo'
+
 async function main() {
   // 1. fresh database
   const admin = postgres(adminUrl, { max: 1, onnotice: () => {} })
@@ -48,89 +51,73 @@ async function main() {
   // 2. platform migrations, then the CRM content-type tables. Reference targets
   // must be compiled before the types that point at them: account → contact →
   // lead → deal → activity. (Folds into the app migration stream later.)
-  await migrate({ connectionString: url, log: (m) => console.log(`  ${m}`) })
+  await migrate({ connectionString: url!, log: (m) => console.log(`  ${m}`) })
   const ddl = postgres(url!, { max: 1, onnotice: () => {} })
   for (const def of [account, contact, lead, deal, activity]) {
     await ddl.unsafe(compileContentType(def).sql)
     console.log(`• created content type "${def.name}"`)
   }
-
-  // 2.5 two-role split (design §13.2): the app must connect as a non-superuser
-  // runtime role — superusers bypass RLS, so running the app as `postgres`
-  // silently disables tenant isolation. Seed/migrate keep the owner URL; the
-  // app's DATABASE_URL uses govcrm_app (see .env.example).
-  await ddl.unsafe(
-    `DO $$ BEGIN CREATE ROLE govcrm_app LOGIN PASSWORD 'govcrm-app-dev'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
-  )
-  await ddl.unsafe('GRANT USAGE ON SCHEMA govcore TO govcrm_app')
-  await ddl.unsafe('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA govcore TO govcrm_app')
-  await ddl.unsafe('GRANT USAGE ON SCHEMA content TO govcrm_app')
-  await ddl.unsafe('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA content TO govcrm_app')
-  console.log('• created runtime role govcrm_app (non-owner; RLS applies)')
   await ddl.end()
 
-  // 3. platform seed: orgs, users, memberships
+  // 2.5 two-role split (design §13.2): the app connects as a non-superuser
+  // runtime role so FORCE RLS binds it. @govcore/setup's provisionRuntimeRole
+  // creates the role + DML grants (incl. default privileges) on both the govcore
+  // and content schemas — run after the content tables exist so they're covered.
+  await provisionRuntimeRole({
+    connectionString: url!,
+    role: 'govcrm_app',
+    password: 'govcrm-app-dev',
+    schemas: ['govcore', 'content'],
+    log: (m) => console.log(`  ${m}`),
+  })
+  console.log('• provisioned runtime role govcrm_app (non-owner; RLS applies)')
+
+  // 3. platform seed. bootstrap creates the first org + instance-admin on the
+  // (empty) instance; the demo contributor/viewer and second org are added with
+  // the same core functions the console uses (provisionUser / createOrganization).
   const sql = postgres(url!, { max: 1, onnotice: () => {} })
   const db = drizzle(sql)
 
-  const [orgA] = await db
-    .insert(organizations)
-    .values({ name: 'City of Riverbend', slug: 'city-of-riverbend' })
-    .returning()
-  const [orgB] = await db
-    .insert(organizations)
-    .values({ name: 'Harris County', slug: 'harris-county' })
-    .returning()
+  const boot = await bootstrap(db, {
+    organization: { name: 'City of Riverbend', slug: 'city-of-riverbend' },
+    admin: { email: 'admin@govcrm.test', name: 'Avery Admin', password: DEMO_PASSWORD },
+  })
+  if (!boot.ok) throw new Error(`bootstrap failed: ${boot.reason}`)
+  const orgAId = boot.organizationId
+  const adminId = boot.adminUserId
 
-  const passwordHash = await hashPassword('govcrm-demo')
-  const [admin1] = await db
-    .insert(users)
-    .values({
-      organizationId: orgA.id,
-      email: 'admin@govcrm.test',
-      name: 'Avery Admin',
-      role: 'admin',
-      instanceRole: 'instance_admin',
-      passwordHash,
-    })
-    .returning()
-  const [contributor1] = await db
-    .insert(users)
-    .values({
-      organizationId: orgA.id,
-      email: 'casey@riverbend.example',
-      name: 'Casey Contributor',
-      role: 'contributor',
-      passwordHash,
-    })
-    .returning()
-  const [viewer1] = await db
-    .insert(users)
-    .values({
-      organizationId: orgB.id,
-      email: 'val@harris.example',
-      name: 'Val Viewer',
-      role: 'viewer',
-      passwordHash,
-    })
-    .returning()
+  const orgBResult = await createOrganization(db, {
+    name: 'Harris County',
+    slug: 'harris-county',
+    actorUserId: adminId,
+  })
+  if (!orgBResult.ok) throw new Error(`createOrganization failed: ${orgBResult.reason}`)
+  const orgBId = orgBResult.organization.id
 
-  await db.insert(userOrganizationMemberships).values([
-    { userId: admin1.id, organizationId: orgA.id, role: 'admin', isPrimary: true },
-    { userId: contributor1.id, organizationId: orgA.id, role: 'contributor', isPrimary: true },
-    { userId: viewer1.id, organizationId: orgB.id, role: 'viewer', isPrimary: true },
-  ])
+  const casey = await provisionUser(db, {
+    email: 'casey@riverbend.example',
+    name: 'Casey Contributor',
+    organizationId: orgAId,
+    role: 'contributor',
+    password: DEMO_PASSWORD,
+    actorUserId: adminId,
+  })
+  if (!casey.ok) throw new Error(`provisionUser (casey) failed: ${casey.reason}`)
 
-  await db.insert(auditLog).values([
-    { action: 'org.create', entityType: 'organization', entityId: orgA.id, organizationId: orgA.id, userId: admin1.id },
-    { action: 'org.create', entityType: 'organization', entityId: orgB.id, organizationId: orgB.id, userId: admin1.id },
-    { action: 'user.invite', entityType: 'user', entityId: contributor1.id, organizationId: orgA.id, userId: admin1.id },
-  ])
+  const val = await provisionUser(db, {
+    email: 'val@harris.example',
+    name: 'Val Viewer',
+    organizationId: orgBId,
+    role: 'viewer',
+    password: DEMO_PASSWORD,
+    actorUserId: adminId,
+  })
+  if (!val.ok) throw new Error(`provisionUser (val) failed: ${val.reason}`)
 
   // 4. CRM seed for orgA. Content tables FORCE RLS — set the active-org GUC
   // first (the same scope tenantAction sets at request time).
-  await sql.unsafe(`SELECT set_config('app.current_org', '${orgA.id}', false)`)
-  const org = { organizationId: orgA.id }
+  await sql.unsafe(`SELECT set_config('app.current_org', '${orgAId}', false)`)
+  const org = { organizationId: orgAId }
 
   const [ramirez] = await db
     .insert(accountTable)

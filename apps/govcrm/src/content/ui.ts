@@ -1,7 +1,7 @@
 // Per-type UI config for the content screens: reference option loaders (from
 // the generated list() actions, RLS-scoped) and enumerated-field choices.
 
-import type { ReferenceDisplayMap } from '@/components/content-screens'
+import type { ReferenceDisplayMap } from '@govcore/content/screens'
 import { accountActions, contactActions, dealActions } from './actions'
 import { ACTIVITY_TYPES } from './activity'
 import { DEAL_STAGES } from './deal'

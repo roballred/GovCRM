@@ -1,5 +1,5 @@
 import { revalidatePath } from 'next/cache'
-import { ContentForm, ContentListScreen, parseContentForm } from '@/components/content-screens'
+import { ContentForm, ContentListScreen, parseContentForm } from '@govcore/content/screens'
 import { lead } from '@/content/lead'
 import { leadActions } from '@/content/actions'
 import { leadChoices } from '@/content/ui'

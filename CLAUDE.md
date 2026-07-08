@@ -12,13 +12,13 @@ GovCRM is a free, open-source CRM for state and local government, built on the *
 
 ## Critical Invariants (learned from GovEA/GovCore — do not rediscover these)
 
-- **`@govcore/*` packages are source-first** (`main: ./src/index.ts`, no `dist/`) even on npm: every consumed package must be listed in `transpilePackages` in `apps/govcrm/next.config.ts`.
+- **`@govcore/*` packages ship compiled `dist/`** (ESM + `.d.ts`, `main: ./dist/index.js`) as of the 0.3/0.4 wave (GovCore #71) — Next resolves them like any npm dep, so **no `transpilePackages`** and no leaking of core's internal `@types` (e.g. `@types/bcryptjs`). Do not reintroduce either.
 - **Platform tables are migration-based from day one** — `govcore-migrate` (the seed script runs it). Never apply `db:push` to `govcore.*` tables. Domain tables may use drizzle-kit migrations; every new domain table ships its RLS policy in the same migration.
 - **Tenant isolation is RLS + the `app.current_org` GUC** set inside `tenantAction` transactions from the trusted session. Never accept an organization ID from request input.
 - **Role vocabulary is app-local** (admin / contributor / viewer in `src/lib/rbac.ts`), supplied to `createRbac` — GovCore has no baked-in roles.
 - **Next.js middleware `config.matcher` must stay inline** — an imported matcher value fails Next's static parsing.
 - **The app must connect as the non-superuser runtime role (`govcrm_app`)** — superusers bypass RLS, silently disabling tenant isolation. The seed provisions the role and grants (two-role split, GovCore design §13.2). Verified: cross-org reads return 0 rows under this role.
-- **Auth uses a separate owner-credentialed pool** (`AUTH_DATABASE_URL`, only consumed by `createAuth` via `authDb`): the login credentials lookup runs before any org context exists, and `govcore.users` RLS requires the org GUC — login is impossible on the runtime role. GovCore consumer gap, filed upstream.
+- **Auth uses a separate owner-credentialed pool** (`AUTH_DATABASE_URL`) passed to `createAuth` as the first-class `authDb` param (GovCore #57): the login credentials lookup runs before any org context exists, and `govcore.users` RLS requires the org GUC — login is impossible on the runtime `db`. Same pool (`platformDb`) backs the instance console's `operatorAction` seam (`src/lib/operator.ts`) for cross-org operator mutations.
 - **Local DB runs in podman** (`podman run -d --name govcrm-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 docker.io/library/postgres:16`), then seed with the owner URL: `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/govcrm_dev pnpm seed`. `pnpm build`/typecheck need no DB.
 
 ## Traceability

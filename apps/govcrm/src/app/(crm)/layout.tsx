@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { auth } from '@/lib/auth'
-import { AppShell } from '@/components/app-shell'
+import { AppShell } from '@govcore/nextkit'
 import { CrmNav } from '@/components/crm-nav'
 import { SignOutButton } from '@/components/sign-out-button'
 

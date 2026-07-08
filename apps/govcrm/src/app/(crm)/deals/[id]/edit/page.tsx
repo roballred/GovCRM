@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { ContentForm, parseContentForm } from '@/components/content-screens'
+import { ContentForm, parseContentForm } from '@govcore/content/screens'
 import { deal } from '@/content/deal'
 import { dealActions } from '@/content/actions'
 import { dealChoices, dealRefs } from '@/content/ui'

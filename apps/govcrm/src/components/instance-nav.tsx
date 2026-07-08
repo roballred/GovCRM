@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { SideNav } from '@/components/app-shell'
+import { SideNav } from '@govcore/nextkit'
 
 const NAV = [
   { href: '/instance', label: 'Overview', exact: true },

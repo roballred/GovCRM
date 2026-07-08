@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { AppShell } from '@/components/app-shell'
+import { AppShell } from '@govcore/nextkit'
 import { InstanceNav } from '@/components/instance-nav'
 import { SignOutButton } from '@/components/sign-out-button'
 
