@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { auth } from '@/lib/auth'
 import { AppShell } from '@govcore/nextkit'
+import { DarkModeToggle } from '@govcore/nextkit/theming'
 import { CrmNav } from '@/components/crm-nav'
 import { SignOutButton } from '@/components/sign-out-button'
 
@@ -15,7 +16,12 @@ export default async function CrmLayout({ children }: { children: ReactNode }) {
       title={<a href="/dashboard">GovCRM</a>}
       nav={<CrmNav showInstance={user?.instanceRole === 'instance_admin'} />}
       user={user ?? undefined}
-      actions={<SignOutButton />}
+      actions={
+        <>
+          <DarkModeToggle />
+          <SignOutButton />
+        </>
+      }
     >
       {children}
     </AppShell>

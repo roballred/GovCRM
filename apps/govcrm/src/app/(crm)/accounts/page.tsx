@@ -1,20 +1,19 @@
-import { revalidatePath } from 'next/cache'
-import { ContentForm, ContentListScreen, parseContentForm } from '@govcore/content/screens'
+import { ContentListScreen } from '@govcore/content/screens'
+import { auth } from '@/lib/auth'
 import { account } from '@/content/account'
 import { accountActions } from '@/content/actions'
-import { accountChoices } from '@/content/ui'
+import { accountChoices, toQuery } from '@/content/ui'
 
 export const dynamic = 'force-dynamic'
 
 // Capability: cdm-account-management
-async function createAccount(formData: FormData) {
-  'use server'
-  await accountActions.create(parseContentForm(account, formData))
-  revalidatePath('/accounts')
-}
-
-export default async function AccountsPage() {
-  const rows = await accountActions.list()
+export default async function AccountsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const [rows, session, sp] = await Promise.all([accountActions.list(), auth(), searchParams])
+  const canEdit = session?.user?.role === 'admin' || session?.user?.role === 'contributor'
 
   return (
     <div className="max-w-4xl">
@@ -24,12 +23,12 @@ export default async function AccountsPage() {
         basePath="/accounts"
         title="Accounts"
         description="Organizations this office works with — vendors, partners, community groups."
+        newHref="/accounts/new"
+        canEdit={canEdit}
+        searchable
+        filters={[{ field: 'account_type', label: 'Type', options: accountChoices.account_type }]}
+        query={toQuery(sp)}
       />
-
-      <section className="mt-10">
-        <h2 className="mb-3 text-lg font-semibold">New account</h2>
-        <ContentForm def={account} action={createAccount} choices={accountChoices} />
-      </section>
     </div>
   )
 }

@@ -16,6 +16,13 @@ export function toOptions(rows: Row[], labelKey: string) {
 const cap = (v: string) => (v ? v[0].toUpperCase() + v.slice(1).replace(/-/g, ' ') : v)
 export const choiceList = (vals: readonly string[]) => vals.map((v) => ({ value: v, label: cap(v) }))
 
+/** Flatten a route's searchParams to the flat `Record<string,string>` ContentListScreen wants. */
+export function toQuery(sp: Record<string, string | string[] | undefined>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(sp).map(([k, v]) => [k, Array.isArray(v) ? (v[0] ?? '') : (v ?? '')]),
+  )
+}
+
 const ACCOUNT_TYPES = ['vendor', 'partner', 'community', 'other'] as const
 const LEAD_SOURCES = ['web-form', 'referral', 'event', 'other'] as const
 

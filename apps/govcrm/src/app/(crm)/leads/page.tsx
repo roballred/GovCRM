@@ -1,21 +1,19 @@
-import { revalidatePath } from 'next/cache'
-import { ContentForm, ContentListScreen, parseContentForm } from '@govcore/content/screens'
+import { ContentListScreen } from '@govcore/content/screens'
+import { auth } from '@/lib/auth'
 import { lead } from '@/content/lead'
 import { leadActions } from '@/content/actions'
-import { leadChoices } from '@/content/ui'
+import { leadChoices, toQuery } from '@/content/ui'
 
 export const dynamic = 'force-dynamic'
 
 // Capability: sfa-lead-management
-async function createLead(formData: FormData) {
-  'use server'
-  const values = parseContentForm(lead, formData)
-  await leadActions.create({ ...values, lead_status: values.lead_status ?? 'new' })
-  revalidatePath('/leads')
-}
-
-export default async function LeadsPage() {
-  const rows = await leadActions.list()
+export default async function LeadsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const [rows, session, sp] = await Promise.all([leadActions.list(), auth(), searchParams])
+  const canEdit = session?.user?.role === 'admin' || session?.user?.role === 'contributor'
 
   return (
     <div className="max-w-4xl">
@@ -25,12 +23,12 @@ export default async function LeadsPage() {
         basePath="/leads"
         title="Leads"
         description="Unqualified prospects — qualify them, then convert to contacts and deals."
+        newHref="/leads/new"
+        canEdit={canEdit}
+        searchable
+        filters={[{ field: 'lead_status', label: 'Status', options: leadChoices.lead_status }]}
+        query={toQuery(sp)}
       />
-
-      <section className="mt-10">
-        <h2 className="mb-3 text-lg font-semibold">New lead</h2>
-        <ContentForm def={lead} action={createLead} choices={leadChoices} />
-      </section>
     </div>
   )
 }

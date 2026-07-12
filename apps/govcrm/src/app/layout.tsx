@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { themeToCss } from '@govcore/theme'
-import { govcrmTheme } from '@/lib/theme'
+import { themesToCss, starterThemes } from '@govcore/theme'
+import { ThemeInitScript } from '@govcore/nextkit'
 import './globals.css'
 
 export const metadata = {
@@ -10,12 +10,17 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className="bg-background text-foreground antialiased">
-        {/* Brand theme over the WCAG-AA base tokens — defineTheme sanitizes values. */}
-        <style dangerouslySetInnerHTML={{ __html: themeToCss(govcrmTheme) }} />
-        {children}
-      </body>
+    // suppressHydrationWarning: ThemeInitScript sets data-theme/.dark on <html>
+    // before hydration, so the server markup intentionally differs.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Restore the saved brand + dark mode before first paint (no FOUC). */}
+        <ThemeInitScript />
+        {/* The shared GovCore theme registry — one <style> holds every brand
+            under its data-theme selector; ThemeSelector flips the attribute. */}
+        <style dangerouslySetInnerHTML={{ __html: themesToCss(starterThemes) }} />
+      </head>
+      <body className="bg-background text-foreground antialiased">{children}</body>
     </html>
   )
 }

@@ -25,6 +25,7 @@ export default async function OrganizationsPage({
   ])
   const userCounts = new Map<string, number>()
   for (const u of allUsers) {
+    if (!u.organizationId) continue // users.organizationId is nullable (schema 0.4)
     userCounts.set(u.organizationId, (userCounts.get(u.organizationId) ?? 0) + 1)
   }
 

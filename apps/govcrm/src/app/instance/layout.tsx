@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { AppShell } from '@govcore/nextkit'
+import { DarkModeToggle } from '@govcore/nextkit/theming'
 import { InstanceNav } from '@/components/instance-nav'
 import { SignOutButton } from '@/components/sign-out-button'
 
@@ -19,7 +20,12 @@ export default async function InstanceLayout({ children }: { children: ReactNode
       nav={<InstanceNav />}
       navAriaLabel="Instance console"
       user={session?.user ?? undefined}
-      actions={<SignOutButton />}
+      actions={
+        <>
+          <DarkModeToggle />
+          <SignOutButton />
+        </>
+      }
     >
       {children}
     </AppShell>

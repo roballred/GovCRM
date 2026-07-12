@@ -1,20 +1,24 @@
-import { revalidatePath } from 'next/cache'
-import { ContentForm, ContentListScreen, parseContentForm } from '@govcore/content/screens'
+import { ContentListScreen } from '@govcore/content/screens'
+import { auth } from '@/lib/auth'
 import { contact } from '@/content/contact'
 import { contactActions } from '@/content/actions'
-import { contactRefs } from '@/content/ui'
+import { contactRefs, toQuery } from '@/content/ui'
 
 export const dynamic = 'force-dynamic'
 
 // Capability: cdm-contact-management
-async function createContact(formData: FormData) {
-  'use server'
-  await contactActions.create(parseContentForm(contact, formData))
-  revalidatePath('/contacts')
-}
-
-export default async function ContactsPage() {
-  const [rows, references] = await Promise.all([contactActions.list(), contactRefs()])
+export default async function ContactsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const [rows, references, session, sp] = await Promise.all([
+    contactActions.list(),
+    contactRefs(),
+    auth(),
+    searchParams,
+  ])
+  const canEdit = session?.user?.role === 'admin' || session?.user?.role === 'contributor'
 
   return (
     <div className="max-w-4xl">
@@ -25,12 +29,11 @@ export default async function ContactsPage() {
         references={references}
         title="Contacts"
         description="People this office works with."
+        newHref="/contacts/new"
+        canEdit={canEdit}
+        searchable
+        query={toQuery(sp)}
       />
-
-      <section className="mt-10">
-        <h2 className="mb-3 text-lg font-semibold">New contact</h2>
-        <ContentForm def={contact} action={createContact} references={references} />
-      </section>
     </div>
   )
 }

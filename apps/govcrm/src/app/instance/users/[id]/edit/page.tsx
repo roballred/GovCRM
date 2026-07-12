@@ -31,7 +31,9 @@ export default async function EditUserPage({
   const [{ id }, { error }] = await Promise.all([params, searchParams])
   const [user] = await platformDb.select().from(users).where(eq(users.id, id))
   if (!user) notFound()
-  const [org] = await platformDb.select().from(organizations).where(eq(organizations.id, user.organizationId))
+  const [org] = user.organizationId
+    ? await platformDb.select().from(organizations).where(eq(organizations.id, user.organizationId))
+    : []
 
   return (
     <div className="max-w-xl">
