@@ -3,7 +3,8 @@ packages:
 allowBuilds:
   esbuild: true
   sharp: true
+# @govcore/* are our own first-party packages (we publish them); exempt the whole
+# scope from the minimum-release-age supply-chain gate so a fresh GovCore release
+# can be adopted immediately. The gate still protects all third-party deps.
 minimumReleaseAgeExclude:
-  - '@govcore/auth@0.5.0'
-  - '@govcore/middleware@0.1.6'
-  - '@govcore/setup@0.1.2'
+  - '@govcore/*'

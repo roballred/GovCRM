@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { ContentListScreen } from '@govcore/content/screens'
 import { auth } from '@/lib/auth'
 import { contact } from '@/content/contact'
@@ -7,6 +8,12 @@ import { contactRefs, toQuery } from '@/content/ui'
 export const dynamic = 'force-dynamic'
 
 // Capability: cdm-contact-management
+async function deleteContact(formData: FormData) {
+  'use server'
+  await contactActions.remove({ id: String(formData.get('id')) })
+  revalidatePath('/contacts')
+}
+
 export default async function ContactsPage({
   searchParams,
 }: {
@@ -18,7 +25,8 @@ export default async function ContactsPage({
     auth(),
     searchParams,
   ])
-  const canEdit = session?.user?.role === 'admin' || session?.user?.role === 'contributor'
+  const role = session?.user?.role
+  const canEdit = role === 'admin' || role === 'contributor'
 
   return (
     <div className="max-w-4xl">
@@ -31,6 +39,9 @@ export default async function ContactsPage({
         description="People this office works with."
         newHref="/contacts/new"
         canEdit={canEdit}
+        canDelete={role === 'admin'}
+        deleteAction={deleteContact}
+        columns={['first_name', 'last_name', 'email', 'title', 'account']}
         searchable
         query={toQuery(sp)}
       />
